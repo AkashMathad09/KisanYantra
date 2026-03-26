@@ -1,0 +1,5 @@
+{
+  "name": "KisanYantra - Machinery Rental",
+  "description": "A location-based platform connecting farmers with machinery owners for affordable equipment rental.",
+  "requestFramePermissions": ["geolocation", "microphone"]
+}

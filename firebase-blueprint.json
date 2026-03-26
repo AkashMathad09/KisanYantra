@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "description": "Email address" },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "User role" },
+        "status": { "type": "string", "enum": ["active", "restricted"], "description": "User status" },
+        "location": { "type": "string", "description": "General location or city" },
+        "language": { "type": "string", "description": "Preferred language code" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "bankAccount": { "type": "string", "description": "Bank account number" },
+        "ifscCode": { "type": "string", "description": "IFSC code" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation date" }
+      },
+      "required": ["uid", "name", "role", "status", "createdAt"]
+    },
+    "Machine": {
+      "title": "Machine",
+      "description": "Agricultural machinery listing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique machine ID" },
+        "ownerId": { "type": "string", "description": "UID of the machine owner" },
+        "name": { "type": "string", "description": "Machine name (e.g., Tractor, Harvester)" },
+        "type": { "type": "string", "description": "Type of machinery" },
+        "price": { "type": "number", "description": "Rental price" },
+        "priceUnit": { "type": "string", "enum": ["hr", "acre"], "description": "Price unit: per hour or per acre" },
+        "image": { "type": "string", "description": "URL of the machine image" },
+        "location": { "type": "string", "description": "Location where the machine is available" },
+        "description": { "type": "string", "description": "Detailed description of the machine" },
+        "available": { "type": "boolean", "description": "Availability status" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "Approval status" }
+      },
+      "required": ["ownerId", "name", "price", "priceUnit", "status"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Machinery booking record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique booking ID" },
+        "renterId": { "type": "string", "description": "UID of the farmer" },
+        "renterName": { "type": "string", "description": "Name of the farmer" },
+        "machineId": { "type": "string", "description": "ID of the booked machine" },
+        "machineName": { "type": "string", "description": "Name of the booked machine" },
+        "ownerId": { "type": "string", "description": "UID of the machine owner" },
+        "date": { "type": "string", "format": "date-time", "description": "Creation date" },
+        "bookingDate": { "type": "string", "format": "date", "description": "The date the machine is booked for" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"], "description": "Booking status" },
+        "work_done": { "type": "boolean", "description": "Whether work is marked as done" },
+        "basePrice": { "type": "number", "description": "Original rental price" },
+        "renterFee": { "type": "number", "description": "Extra fee paid by renter" },
+        "renterTotal": { "type": "number", "description": "Total paid by renter" },
+        "ownerFee": { "type": "number", "description": "Fee deducted from owner" },
+        "ownerNet": { "type": "number", "description": "Net amount to owner" },
+        "totalPrice": { "type": "number", "description": "Compatibility field" },
+        "workDuration": { "type": "number", "description": "Duration of work" }
+      },
+      "required": ["renterId", "machineId", "ownerId", "date", "bookingDate", "status", "basePrice", "renterTotal", "ownerNet"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notifications",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user receiving the notification" },
+        "message": { "type": "string", "description": "Notification message" },
+        "date": { "type": "string", "format": "date-time", "description": "Notification date" },
+        "read": { "type": "boolean", "description": "Read status" },
+        "type": { "type": "string", "enum": ["info", "success", "warning"], "description": "Notification type" }
+      },
+      "required": ["userId", "message", "date", "read", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/machines/{machineId}": {
+      "schema": "Machine",
+      "description": "Machinery listings"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Booking records"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "/settings/platform": {
+      "schema": "object",
+      "description": "Global platform settings"
+    }
+  }
+}

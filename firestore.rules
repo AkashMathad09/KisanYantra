@@ -1,0 +1,230 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID
+    //   - name: string (required, 1-50 chars) - Full name
+    //   - email: string (optional, email format) - Email address
+    //   - role: string (required, enum: ['user', 'admin']) - User role
+    //   - location: string (optional, 0-100 chars) - General location
+    //   - language: string (optional, 2-5 chars) - Preferred language code
+    //   - phone: string (optional, 10-15 chars) - Contact phone number
+    //   - bankAccount: string (optional, 0-20 chars) - Bank account number
+    //   - ifscCode: string (optional, 0-11 chars) - IFSC code
+    //
+    // Collection: machines
+    // Document ID: machineId (Auto-generated)
+    // Fields:
+    //   - id: string (required) - Unique machine ID
+    //   - ownerId: string (required) - UID of the machine owner
+    //   - name: string (required, 1-100 chars) - Machine name
+    //   - type: string (required, 1-50 chars) - Type of machinery
+    //   - price: number (required, positive) - Rental price
+    //   - priceUnit: string (required, enum: ['hr', 'acre']) - Price unit
+    //   - image: string (optional, URL format) - Machine image URL
+    //   - location: string (optional, 0-100 chars) - Availability location
+    //   - description: string (optional, 0-500 chars) - Machine description
+    //   - available: bool (required) - Availability status
+    //   - status: string (required, enum: ['pending', 'approved', 'rejected']) - Approval status
+    //
+    // Collection: settings
+    // Document ID: platform
+    // Fields:
+    //   - fee: number (required, 0-100) - Platform fee percentage
+    // Collection: bookings
+    // Document ID: bookingId (Auto-generated)
+    // Fields:
+    //   - id: string (required) - Unique booking ID
+    //   - renterId: string (required) - UID of the farmer
+    //   - renterName: string (required) - Name of the farmer
+    //   - machineId: string (required) - ID of the booked machine
+    //   - machineName: string (required) - Name of the machine
+    //   - ownerId: string (required) - UID of the machine owner
+    //   - date: string (required, ISO 8601 format) - Creation date
+    //   - bookingDate: string (required, YYYY-MM-DD format) - The date machine is booked for
+    //   - status: string (required, enum: ['pending', 'confirmed', 'completed', 'cancelled']) - Status
+    //   - work_done: bool (required) - Work completion status
+    //   - totalPrice: number (required, positive) - Calculated price
+    //   - workDuration: number (optional, positive) - Duration of work
+    //   - platformFee: number (optional, positive) - Platform fee
+    //   - netAmount: number (optional, positive) - Net amount to owner
+    //
+    // Collection: notifications
+    // Document ID: notificationId (Auto-generated)
+    // Fields:
+    //   - userId: string (required) - UID of the recipient
+    //   - message: string (required) - Notification message
+    //   - date: string (required, ISO 8601 format) - Notification date
+    //   - read: bool (required) - Read status
+    //   - type: string (required, enum: ['info', 'success', 'warning']) - Type
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "akashmathad0@gmail.com" || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isActive() {
+      return isAuthenticated() && 
+        (isAdmin() || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active'));
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      // Avoid running regex on very long strings (like base64) as it can fail/timeout
+      return url is string && (url.size() > 1000 || url.matches("^https?://.*") || url.matches("^data:.*"));
+    }
+
+    function isValidDateString(dateStr) {
+      // Accept any ISO-8601-like string: YYYY-MM-DD... 
+      return dateStr is string && dateStr.size() >= 10 && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}.*");
+    }
+
+    function isValidSimpleDate(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'name', 'role', 'status', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'name', 'email', 'role', 'status', 'location', 'language', 'phone', 'phoneVerified', 'bankAccount', 'ifscCode', 'createdAt']) &&
+             (data.uid == request.auth.uid || isAdmin()) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 50 &&
+             data.role in ['user', 'admin'] &&
+             data.status in ['active', 'restricted'] &&
+             isValidDateString(data.createdAt) &&
+             (!('email' in data) || isValidEmail(data.email)) &&
+             (!('location' in data) || (data.location is string && data.location.size() <= 100)) &&
+             (!('language' in data) || (data.language is string && data.language.size() >= 2 && data.language.size() <= 5)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15)) &&
+             (!('bankAccount' in data) || (data.bankAccount is string && data.bankAccount.size() <= 20)) &&
+             (!('ifscCode' in data) || (data.ifscCode is string && data.ifscCode.size() <= 11));
+    }
+
+    function isValidMachine(data) {
+      return hasRequiredFields(['ownerId', 'name', 'type', 'price', 'priceUnit', 'available', 'status']) &&
+             (data.ownerId == request.auth.uid || isAdmin()) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.type is string && data.type.size() > 0 && data.type.size() <= 50 &&
+             data.price is number && data.price > 0 &&
+             data.priceUnit in ['hr', 'acre'] &&
+             data.available is bool &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             (!('image' in data) || isValidUrl(data.image)) &&
+             (!('location' in data) || (data.location is string && data.location.size() <= 100)) &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 500));
+    }
+
+    function isValidBooking(data) {
+      return hasRequiredFields(['renterId', 'renterName', 'machineId', 'machineName', 'ownerId', 'date', 'bookingDate', 'status', 'work_done', 'basePrice', 'renterTotal', 'ownerNet']) &&
+             hasOnlyAllowedFields(['id', 'renterId', 'renterName', 'machineId', 'machineName', 'ownerId', 'date', 'bookingDate', 'status', 'work_done', 'basePrice', 'renterFee', 'renterTotal', 'ownerFee', 'ownerNet', 'totalPrice', 'workDuration']) &&
+             data.machineId is string &&
+             data.ownerId is string &&
+             isValidDateString(data.date) &&
+             isValidSimpleDate(data.bookingDate) &&
+             data.status in ['pending', 'confirmed', 'completed', 'cancelled'] &&
+             data.work_done is bool &&
+             data.basePrice is number && data.basePrice > 0 &&
+             data.renterTotal is number && data.renterTotal > 0 &&
+             data.ownerNet is number && data.ownerNet > 0 &&
+             (!('workDuration' in data) || (data.workDuration is number && data.workDuration > 0)) &&
+             (!('renterFee' in data) || (data.renterFee is number && data.renterFee >= 0)) &&
+             (!('ownerFee' in data) || (data.ownerFee is number && data.ownerFee >= 0)) &&
+             (!('totalPrice' in data) || (data.totalPrice is number && data.totalPrice >= 0));
+    }
+
+    function isValidNotification(data) {
+      return hasRequiredFields(['userId', 'message', 'date', 'read', 'type']) &&
+             hasOnlyAllowedFields(['id', 'userId', 'message', 'date', 'read', 'type']) &&
+             data.userId is string &&
+             data.message is string && data.message.size() > 0 &&
+             isValidDateString(data.date) &&
+             data.read is bool &&
+             data.type in ['info', 'success', 'warning'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      // Allow create if the authenticated user is writing their own document
+      // isOwner already handles uid == request.auth.uid
+      allow create: if isAuthenticated() && request.auth.uid == userId && isValidUser(request.resource.data);
+      allow update: if (isAuthenticated() && request.auth.uid == userId || isAdmin()) && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /login_lookups/{lookupId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /machines/{machineId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if (isOwner(resource.data.ownerId) || isAdmin()) && isValidMachine(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.renterId || request.auth.uid == resource.data.ownerId || isAdmin());
+      allow create: if isActive() && request.resource.data.renterId == request.auth.uid && isValidBooking(request.resource.data);
+      allow update: if (isOwner(resource.data.renterId) || isOwner(resource.data.ownerId) || isAdmin()) &&
+                    isValidBooking(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated(); // Allow users to notify each other
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
