@@ -1837,8 +1837,6 @@ function BrowseMachines() {
   };
   const [bookingDate, setBookingDate] = useState('');
   const [bookingTime, setBookingTime] = useState('');
-  const [deliveryLocation, setDeliveryLocation] = useState('');
-  const [deliveryCoordinates, setDeliveryCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
 
   useEffect(() => {
