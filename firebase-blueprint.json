@@ -51,6 +51,7 @@
         "ownerId": { "type": "string", "description": "UID of the machine owner" },
         "date": { "type": "string", "format": "date-time", "description": "Creation date" },
         "bookingDate": { "type": "string", "format": "date", "description": "The date the machine is booked for" },
+        "bookingTime": { "type": "string", "format": "time", "description": "The time the machine is booked for" },
         "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"], "description": "Booking status" },
         "work_done": { "type": "boolean", "description": "Whether work is marked as done" },
         "basePrice": { "type": "number", "description": "Original rental price" },
@@ -61,7 +62,7 @@
         "totalPrice": { "type": "number", "description": "Compatibility field" },
         "workDuration": { "type": "number", "description": "Duration of work" }
       },
-      "required": ["renterId", "machineId", "ownerId", "date", "bookingDate", "status", "basePrice", "renterTotal", "ownerNet"]
+      "required": ["renterId", "machineId", "ownerId", "date", "bookingDate", "bookingTime", "status", "basePrice", "renterTotal", "ownerNet"]
     },
     "Notification": {
       "title": "Notification",

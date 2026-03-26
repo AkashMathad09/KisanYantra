@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
 import { 
   onAuthStateChanged, 
   signOut,
@@ -44,9 +44,13 @@ import {
   Menu,
   X,
   Mic,
-  MicOff
+  MicOff,
+  Navigation
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { Icon } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 // --- Types & Helpers ---
 enum OperationType {
@@ -200,6 +204,97 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// --- Location Context ---
+interface LocationContextType {
+  currentLocation: { lat: number; lng: number } | null;
+  currentAddress: string;
+  locationPermission: 'granted' | 'denied' | 'prompt' | null;
+  requestLocation: () => Promise<void>;
+  updateLocation: (location: { lat: number; lng: number }, address: string) => void;
+}
+
+const LocationContext = createContext<LocationContextType>({
+  currentLocation: null,
+  currentAddress: '',
+  locationPermission: null,
+  requestLocation: async () => {},
+  updateLocation: () => {},
+});
+
+function LocationProvider({ children }: { children: React.ReactNode }) {
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [currentAddress, setCurrentAddress] = useState('');
+  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'prompt' | null>(null);
+
+  const reverseGeocode = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+      const data = await response.json();
+      if (data && data.display_name) {
+        setCurrentAddress(data.display_name);
+      }
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+    }
+  };
+
+  const requestLocation = async () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by this browser.');
+      return;
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      setCurrentLocation({ lat: latitude, lng: longitude });
+      setLocationPermission('granted');
+      await reverseGeocode(latitude, longitude);
+    } catch (error: any) {
+      console.error('Location error:', error);
+      if (error.code === error.PERMISSION_DENIED) {
+        setLocationPermission('denied');
+      } else {
+        setLocationPermission('prompt');
+      }
+    }
+  };
+
+  const updateLocation = (location: { lat: number; lng: number }, address: string) => {
+    setCurrentLocation(location);
+    setCurrentAddress(address);
+  };
+
+  // Auto-request location on app start
+  useEffect(() => {
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      requestLocation();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <LocationContext.Provider value={{
+      currentLocation,
+      currentAddress,
+      locationPermission,
+      requestLocation,
+      updateLocation
+    }}>
+      {children}
+    </LocationContext.Provider>
+  );
+}
+
 // --- Main App ---
 
 export default function App() {
@@ -224,9 +319,11 @@ export default function App() {
 
   return (
     <LanguageProvider>
-      <AuthProvider>
-        <KisanYantraApp />
-      </AuthProvider>
+      <LocationProvider>
+        <AuthProvider>
+          <KisanYantraApp />
+        </AuthProvider>
+      </LocationProvider>
     </LanguageProvider>
   );
 }
@@ -1213,7 +1310,6 @@ function LandingPage() {
     name: '',
     email: '',
     phone: '',
-    location: '',
     bankAccount: '',
     ifscCode: '',
   });
@@ -1236,8 +1332,8 @@ function LandingPage() {
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const { name, email, phone, location } = regData;
-    if (!name.trim() || !email.trim() || !phone.trim() || !location.trim()) {
+    const { name, email, phone } = regData;
+    if (!name.trim() || !email.trim() || !phone.trim()) {
       setError('Please fill all required fields.'); return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1316,7 +1412,6 @@ function LandingPage() {
         email: regData.email,
         phone: regData.phone,
         phoneVerified: true,
-        location: regData.location,
         bankAccount: regData.bankAccount || '',
         ifscCode: regData.ifscCode || '',
         role: isAdmin ? 'admin' : 'user',
@@ -1516,23 +1611,13 @@ function LandingPage() {
                     placeholder="email@example.com"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('phone')} *</label>
-                    <input type="tel" required value={regData.phone}
-                      onChange={(e) => setRegData({...regData, phone: e.target.value})}
-                      className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
-                      placeholder="9876543210"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('location')} *</label>
-                    <input type="text" required value={regData.location}
-                      onChange={(e) => setRegData({...regData, location: e.target.value})}
-                      className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
-                      placeholder="City / Village"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('phone')} *</label>
+                  <input type="tel" required value={regData.phone}
+                    onChange={(e) => setRegData({...regData, phone: e.target.value})}
+                    className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                    placeholder="9876543210"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1703,6 +1788,7 @@ function LandingPage() {
 function BrowseMachines() {
   const { t, lang } = useContext(LanguageContext);
   const { profile, user } = useContext(AuthContext);
+  const { currentLocation, currentAddress, locationPermission, requestLocation } = useContext(LocationContext);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [search, setSearch] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -1750,6 +1836,9 @@ function BrowseMachines() {
     }
   };
   const [bookingDate, setBookingDate] = useState('');
+  const [bookingTime, setBookingTime] = useState('');
+  const [deliveryLocation, setDeliveryLocation] = useState('');
+  const [deliveryCoordinates, setDeliveryCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
 
   useEffect(() => {
@@ -1762,7 +1851,7 @@ function BrowseMachines() {
   }, []);
 
   const handleBook = async () => {
-    if (!user || !selectedMachine || !bookingDate) return;
+    if (!user || !selectedMachine || !bookingDate || !bookingTime) return;
     
     // Fetch current platform fee
     const settingsSnap = await getDoc(doc(db, 'settings', 'platform'));
@@ -1784,6 +1873,7 @@ function BrowseMachines() {
       ownerId: selectedMachine.ownerId,
       date,
       bookingDate,
+      bookingTime,
       status: 'pending',
       work_done: false,
       basePrice,
@@ -1795,6 +1885,7 @@ function BrowseMachines() {
     });
     setSelectedMachine(null);
     setBookingDate('');
+    setBookingTime('');
     alert(t('confirmBooking'));
   };
 
@@ -1824,6 +1915,34 @@ function BrowseMachines() {
             title={t('voiceSearch')}
           >
             {isListening ? <MicOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Current Location Display */}
+      <div className="bg-white rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-[#5A5A40]/10 p-2 sm:p-3 rounded-xl">
+              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-[#5A5A40]" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700">{t('currentLocation')}</p>
+              <p className="text-xs sm:text-sm text-gray-500">
+                {locationPermission === 'granted' && currentAddress ? 
+                  currentAddress : 
+                  locationPermission === 'denied' ? 
+                    'Location access denied' : 
+                    'Detecting location...'}
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={requestLocation}
+            className="bg-[#5A5A40] text-white px-3 sm:px-4 py-2 rounded-xl font-bold hover:bg-[#4A4A30] transition-all text-xs sm:text-sm flex items-center gap-2"
+          >
+            <Navigation className="w-3 h-3 sm:w-4 sm:h-4" />
+            {t('refresh')}
           </button>
         </div>
       </div>
@@ -1886,6 +2005,16 @@ function BrowseMachines() {
                   className="w-full p-3 sm:p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40] text-sm sm:text-base"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('bookingTime')}</label>
+                <input 
+                  type="time" 
+                  required 
+                  value={bookingTime} 
+                  onChange={(e) => setBookingTime(e.target.value)}
+                  className="w-full p-3 sm:p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40] text-sm sm:text-base"
+                />
+              </div>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
                 <button 
                   onClick={() => setSelectedMachine(null)}
@@ -1895,7 +2024,7 @@ function BrowseMachines() {
                 </button>
                 <button 
                   onClick={handleBook}
-                  disabled={!bookingDate}
+                  disabled={!bookingDate || !bookingTime}
                   className="flex-1 bg-[#5A5A40] text-white py-3 sm:py-4 rounded-2xl font-bold shadow-lg hover:bg-[#4A4A30] disabled:opacity-50 text-sm sm:text-base"
                 >
                   {t('confirmBooking')}
@@ -2038,6 +2167,7 @@ function AddMachineModal({ onClose }: { onClose: () => void }) {
     location: profile?.location || '',
     image: ''
   });
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   const compressImage = (base64: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -2177,10 +2307,16 @@ function AddMachineModal({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('location')}</label>
-            <input 
-              type="text" required value={formData.location} onChange={(e) => setFormData({...formData, location: e.target.value})}
-              className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]"
-            />
+            <button
+              type="button"
+              onClick={() => setShowLocationPicker(true)}
+              className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40] text-left flex items-center justify-between hover:bg-gray-100 transition-colors"
+            >
+              <span className={formData.location ? 'text-gray-900' : 'text-gray-400'}>
+                {formData.location || 'Select location on map'}
+              </span>
+              <MapPin className="w-4 h-4 text-[#5A5A40]" />
+            </button>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('machineImage')}</label>
@@ -2235,6 +2371,18 @@ function AddMachineModal({ onClose }: { onClose: () => void }) {
           </div>
         </form>
       </motion.div>
+
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <LocationPicker
+          currentLocation={formData.location}
+          onLocationSelect={(location, coordinates) => {
+            setFormData({ ...formData, location });
+            setShowLocationPicker(false);
+          }}
+          onClose={() => setShowLocationPicker(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2338,7 +2486,7 @@ function BookingsList() {
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="font-bold text-base sm:text-lg text-[#5A5A40] truncate">{booking.machineName}</h3>
-          <p className="text-xs sm:text-sm text-gray-500">{t('bookingDate')}: {new Date(booking.bookingDate).toLocaleDateString()}</p>
+          <p className="text-xs sm:text-sm text-gray-500">{t('bookingDate')}: {new Date(booking.bookingDate).toLocaleDateString()} {booking.bookingTime}</p>
           <p className="font-bold text-[#5A5A40] mt-1 text-sm sm:text-base">₹{booking.totalPrice} ({t('perHr')}/{t('perAcre')})</p>
           {booking.ownerId === user?.uid ? (
             <p className="text-xs text-gray-400">{t('roleRenter')}: {booking.renterName}</p>
@@ -2839,4 +2987,238 @@ function ProfilePage() {
       </div>
     </div>
   );
+}
+
+// Location Picker Component with Map, GPS, and Search
+function LocationPicker({ currentLocation, onLocationSelect, onClose }: { 
+  currentLocation: string, 
+  onLocationSelect: (location: string, coordinates?: { lat: number, lng: number }) => void, 
+  onClose: () => void 
+}) {
+  const { t } = useContext(LanguageContext);
+
+  // Fix Leaflet default marker icon issue
+  useEffect(() => {
+    delete (Icon.Default.prototype as any)._getIconUrl;
+    Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    });
+  }, []);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCoords, setSelectedCoords] = useState<{ lat: number, lng: number } | null>(null);
+  const [currentAddress, setCurrentAddress] = useState(currentLocation);
+  const [isLoadingGPS, setIsLoadingGPS] = useState(false);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]); // Default to India center
+  const [mapZoom, setMapZoom] = useState(5);
+  const mapRef = useRef<any>(null);
+
+  // Initialize map with current location if available
+  useEffect(() => {
+    if (currentLocation && currentLocation !== '') {
+      // Try to geocode the current location
+      geocodeLocation(currentLocation);
+    }
+  }, [currentLocation]);
+
+  const geocodeLocation = async (location: string) => {
+    try {
+      // Using Nominatim (OpenStreetMap) for geocoding
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=1`);
+      const data = await response.json();
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        setMapCenter([parseFloat(lat), parseFloat(lon)]);
+        setMapZoom(15);
+        setSelectedCoords({ lat: parseFloat(lat), lng: parseFloat(lon) });
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    }
+  };
+
+  const reverseGeocode = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+      const data = await response.json();
+      if (data && data.display_name) {
+        setCurrentAddress(data.display_name);
+      }
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+    }
+  };
+
+  const getCurrentLocation = () => {
+    setIsLoadingGPS(true);
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by this browser.');
+      setIsLoadingGPS(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setMapCenter([latitude, longitude]);
+        setMapZoom(16);
+        setSelectedCoords({ lat: latitude, lng: longitude });
+        reverseGeocode(latitude, longitude);
+        setIsLoadingGPS(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        alert('Unable to get your current location. Please check your browser permissions.');
+        setIsLoadingGPS(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const handleMapClick = (e: any) => {
+    const { lat, lng } = e.latlng;
+    setSelectedCoords({ lat, lng });
+    reverseGeocode(lat, lng);
+  };
+
+  const handleSearch = async () => {
+    if (searchQuery.trim()) {
+      await geocodeLocation(searchQuery);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (currentAddress && selectedCoords) {
+      onLocationSelect(currentAddress, selectedCoords);
+    } else if (currentAddress) {
+      onLocationSelect(currentAddress);
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white rounded-[32px] w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl"
+      >
+        {/* Header */}
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-[#5A5A40] flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              {t('selectLocation')}
+            </h2>
+            <button 
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder={t('searchLocation')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#5A5A40] focus:border-transparent"
+              />
+            </div>
+            <button 
+              onClick={handleSearch}
+              className="px-4 py-3 bg-[#5A5A40] text-white rounded-2xl hover:bg-[#4A4A30] transition-colors"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Map Container */}
+        <div className="h-80 relative">
+          <MapContainer 
+            center={mapCenter} 
+            zoom={mapZoom} 
+            style={{ height: '100%', width: '100%' }}
+            ref={mapRef}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            />
+            {selectedCoords && (
+              <Marker position={[selectedCoords.lat, selectedCoords.lng]}>
+                <Popup>
+                  <div className="text-center">
+                    <p className="font-semibold">Selected Location</p>
+                    <p className="text-sm text-gray-600">{currentAddress}</p>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
+            <MapEvents onClick={handleMapClick} />
+          </MapContainer>
+
+          {/* GPS Button */}
+          <button
+            onClick={getCurrentLocation}
+            disabled={isLoadingGPS}
+            className="absolute top-4 right-4 bg-white p-3 rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+            title={t('currentLocation')}
+          >
+            {isLoadingGPS ? (
+              <div className="w-5 h-5 border-2 border-[#5A5A40] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Navigation className="w-5 h-5 text-[#5A5A40]" />
+            )}
+          </button>
+        </div>
+
+        {/* Address Display */}
+        <div className="p-4 border-t border-gray-100">
+          <div className="bg-gray-50 rounded-2xl p-4">
+            <p className="text-sm font-medium text-gray-700 mb-1">{t('selectedAddress')}</p>
+            <p className="text-[#5A5A40] font-medium min-h-[1.5rem]">
+              {currentAddress || t('selectLocationHint')}
+            </p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-4 border-t border-gray-100 flex gap-3">
+          <button 
+            onClick={onClose}
+            className="flex-1 py-3 px-6 border border-gray-200 text-gray-600 rounded-2xl font-bold hover:bg-gray-50 transition-colors"
+          >
+            {t('cancel')}
+          </button>
+          <button 
+            onClick={handleConfirm}
+            disabled={!currentAddress}
+            className="flex-1 py-3 px-6 bg-[#5A5A40] text-white rounded-2xl font-bold hover:bg-[#4A4A30] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t('confirmLocation')}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// Map Events Component for handling map clicks
+function MapEvents({ onClick }: { onClick: (e: any) => void }) {
+  const map = useMapEvents({
+    click: onClick,
+  });
+  return null;
 }

@@ -39,6 +39,7 @@ export interface Booking {
   renterName: string;
   date: string; // Creation date
   bookingDate: string; // The date the machine is booked for
+  bookingTime: string; // The time the machine is booked for
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   work_done: boolean;
   basePrice: number; // Original rent

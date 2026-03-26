@@ -49,6 +49,7 @@ service cloud.firestore {
     //   - ownerId: string (required) - UID of the machine owner
     //   - date: string (required, ISO 8601 format) - Creation date
     //   - bookingDate: string (required, YYYY-MM-DD format) - The date machine is booked for
+    //   - bookingTime: string (required, HH:MM format) - The time machine is booked for
     //   - status: string (required, enum: ['pending', 'confirmed', 'completed', 'cancelled']) - Status
     //   - work_done: bool (required) - Work completion status
     //   - totalPrice: number (required, positive) - Calculated price
@@ -110,6 +111,10 @@ service cloud.firestore {
       return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
     }
 
+    function isValidTime(timeStr) {
+      return timeStr is string && timeStr.matches("^\\d{2}:\\d{2}$");
+    }
+
     function hasOnlyAllowedFields(fields) {
       return request.resource.data.keys().hasOnly(fields);
     }
@@ -152,12 +157,13 @@ service cloud.firestore {
     }
 
     function isValidBooking(data) {
-      return hasRequiredFields(['renterId', 'renterName', 'machineId', 'machineName', 'ownerId', 'date', 'bookingDate', 'status', 'work_done', 'basePrice', 'renterTotal', 'ownerNet']) &&
-             hasOnlyAllowedFields(['id', 'renterId', 'renterName', 'machineId', 'machineName', 'ownerId', 'date', 'bookingDate', 'status', 'work_done', 'basePrice', 'renterFee', 'renterTotal', 'ownerFee', 'ownerNet', 'totalPrice', 'workDuration']) &&
+      return hasRequiredFields(['renterId', 'renterName', 'machineId', 'machineName', 'ownerId', 'date', 'bookingDate', 'bookingTime', 'status', 'work_done', 'basePrice', 'renterTotal', 'ownerNet']) &&
+             hasOnlyAllowedFields(['id', 'renterId', 'renterName', 'machineId', 'machineName', 'ownerId', 'date', 'bookingDate', 'bookingTime', 'status', 'work_done', 'basePrice', 'renterFee', 'renterTotal', 'ownerFee', 'ownerNet', 'totalPrice', 'workDuration']) &&
              data.machineId is string &&
              data.ownerId is string &&
              isValidDateString(data.date) &&
              isValidSimpleDate(data.bookingDate) &&
+             isValidTime(data.bookingTime) &&
              data.status in ['pending', 'confirmed', 'completed', 'cancelled'] &&
              data.work_done is bool &&
              data.basePrice is number && data.basePrice > 0 &&
