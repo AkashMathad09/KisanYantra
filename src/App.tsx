@@ -1086,12 +1086,12 @@ function KisanYantraApp() {
   const NavItem = ({ icon: Icon, label, active, onClick }: any) => (
     <button 
       onClick={() => { onClick(); setIsMenuOpen(false); }}
-      className={`flex items-center space-x-3 p-3 rounded-xl transition-all ${
+      className={`flex items-center space-x-3 p-3 sm:p-3 rounded-xl transition-all w-full text-left ${
         active ? 'bg-[#5A5A40] text-white' : 'text-[#5A5A40] hover:bg-[#5A5A40]/10'
       }`}
     >
-      <Icon className="w-5 h-5" />
-      <span className="font-medium">{label}</span>
+      <Icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+      <span className="font-medium text-sm sm:text-base truncate">{label}</span>
     </button>
   );
 
@@ -1099,15 +1099,15 @@ function KisanYantraApp() {
     <div className="min-h-screen bg-[#f5f5f0] flex flex-col md:flex-row">
       {/* Sidebar / Mobile Nav */}
       <nav className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-64 sm:w-72 md:w-80 bg-white shadow-xl transform transition-transform duration-300 ease-in-out
         md:relative md:translate-x-0 ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-6 flex flex-col h-full">
-          <div className="flex items-center space-x-3 mb-10">
+        <div className="p-4 sm:p-6 flex flex-col h-full">
+          <div className="flex items-center space-x-3 mb-6 sm:mb-10">
             <div className="bg-[#5A5A40] p-2 rounded-lg">
-              <Tractor className="w-6 h-6 text-white" />
+              <Tractor className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-[#5A5A40] serif">{t('appName')}</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[#5A5A40] serif">{t('appName')}</h1>
           </div>
 
           <div className="flex-1 space-y-2">
@@ -1161,18 +1161,18 @@ function KisanYantraApp() {
       </nav>
 
       {/* Mobile Header */}
-      <div className="md:hidden bg-white p-4 flex items-center justify-between shadow-sm">
+      <div className="md:hidden bg-white p-3 sm:p-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center space-x-2">
-          <Tractor className="w-6 h-6 text-[#5A5A40]" />
-          <span className="font-bold text-[#5A5A40]">{t('appName')}</span>
+          <Tractor className="w-5 h-5 sm:w-6 sm:h-6 text-[#5A5A40]" />
+          <span className="font-bold text-[#5A5A40] text-sm sm:text-base">{t('appName')}</span>
         </div>
-        <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
-          {isMenuOpen ? <X /> : <Menu />}
+        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2">
+          {isMenuOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
         </button>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+      <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 overflow-y-auto">
         <AnimatePresence mode="wait">
           <motion.div
             key={view}
@@ -1750,60 +1750,60 @@ function BrowseMachines() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h2 className="text-3xl font-bold text-[#5A5A40] serif">{t('browse')}</h2>
-        <div className="relative w-full md:w-96 flex items-center gap-2">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <h2 className="text-2xl sm:text-3xl font-bold text-[#5A5A40] serif">{t('browse')}</h2>
+        <div className="relative w-full lg:w-96 flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
             <input 
               type="text" 
               placeholder={t('search')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-white rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-[#5A5A40]"
+              className="w-full pl-10 sm:pl-12 pr-4 py-2 sm:py-3 bg-white rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-[#5A5A40] text-sm sm:text-base"
             />
           </div>
           <button 
             onClick={startVoiceSearch}
-            className={`p-3 rounded-2xl shadow-sm transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-[#5A5A40] hover:bg-gray-50'}`}
+            className={`p-2 sm:p-3 rounded-2xl shadow-sm transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-[#5A5A40] hover:bg-gray-50'}`}
             title={t('voiceSearch')}
           >
-            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            {isListening ? <MicOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
         {filtered.map(machine => (
           <motion.div 
             layout
             key={machine.id} 
-            className="bg-white rounded-[32px] overflow-hidden shadow-sm hover:shadow-md transition-all"
+            className="bg-white rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-sm hover:shadow-md transition-all"
           >
             <img 
               src={machine.image || `https://picsum.photos/seed/${machine.type}/400/300`} 
               alt={machine.name} 
-              className="w-full h-48 object-cover"
+              className="w-full h-40 sm:h-48 object-cover"
               referrerPolicy="no-referrer"
             />
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <h3 className="text-xl font-bold text-[#5A5A40]">{machine.name}</h3>
+                  <h3 className="text-lg sm:text-xl font-bold text-[#5A5A40]">{machine.name}</h3>
                   <p className="text-sm text-gray-500">{machine.type}</p>
                 </div>
-                <div className="bg-[#5A5A40]/10 px-3 py-1 rounded-full text-[#5A5A40] font-bold">
+                <div className="bg-[#5A5A40]/10 px-2 sm:px-3 py-1 rounded-full text-[#5A5A40] font-bold text-xs sm:text-sm">
                   ₹{machine.price}/{t(machine.priceUnit === 'hr' ? 'perHr' : 'perAcre')}
                 </div>
               </div>
-              <div className="flex items-center text-sm text-gray-500 mb-4">
-                <MapPin className="w-4 h-4 mr-1" />
+              <div className="flex items-center text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
+                <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                 {machine.location}
               </div>
               <button 
                 onClick={() => setSelectedMachine(machine)}
-                className="w-full bg-[#5A5A40] text-white py-3 rounded-xl font-bold hover:bg-[#4A4A30] transition-all"
+                className="w-full bg-[#5A5A40] text-white py-2 sm:py-3 rounded-xl font-bold hover:bg-[#4A4A30] transition-all text-sm sm:text-base"
               >
                 {t('bookNow')}
               </button>
@@ -1813,13 +1813,13 @@ function BrowseMachines() {
       </div>
 
       {selectedMachine && (
-        <div className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-[40px] p-8 max-w-md w-full"
+            className="bg-white rounded-[32px] sm:rounded-[40px] p-6 sm:p-8 max-w-sm sm:max-w-md w-full mx-4"
           >
-            <h3 className="text-2xl font-bold text-[#5A5A40] mb-6 serif">{t('confirmBooking')}</h3>
+            <h3 className="text-xl sm:text-2xl font-bold text-[#5A5A40] mb-4 sm:mb-6 serif">{t('confirmBooking')}</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('bookingDate')}</label>
@@ -1829,20 +1829,20 @@ function BrowseMachines() {
                   min={new Date().toISOString().split('T')[0]}
                   value={bookingDate} 
                   onChange={(e) => setBookingDate(e.target.value)}
-                  className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]"
+                  className="w-full p-3 sm:p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40] text-sm sm:text-base"
                 />
               </div>
-              <div className="flex space-x-4">
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
                 <button 
                   onClick={() => setSelectedMachine(null)}
-                  className="flex-1 py-4 rounded-2xl font-bold text-gray-500 hover:bg-gray-50"
+                  className="flex-1 py-3 sm:py-4 rounded-2xl font-bold text-gray-500 hover:bg-gray-50 text-sm sm:text-base"
                 >
                   {t('cancel')}
                 </button>
                 <button 
                   onClick={handleBook}
                   disabled={!bookingDate}
-                  className="flex-1 bg-[#5A5A40] text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-[#4A4A30] disabled:opacity-50"
+                  className="flex-1 bg-[#5A5A40] text-white py-3 sm:py-4 rounded-2xl font-bold shadow-lg hover:bg-[#4A4A30] disabled:opacity-50 text-sm sm:text-base"
                 >
                   {t('confirmBooking')}
                 </button>
@@ -1884,19 +1884,19 @@ function MyMachines() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold text-[#5A5A40] serif">{t('myMachines')}</h2>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <h2 className="text-2xl sm:text-3xl font-bold text-[#5A5A40] serif">{t('myMachines')}</h2>
         <button 
           onClick={() => setShowAdd(true)}
-          className="bg-[#5A5A40] text-white px-6 py-3 rounded-2xl font-bold flex items-center space-x-2 shadow-lg"
+          className="bg-[#5A5A40] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-2xl font-bold flex items-center space-x-2 shadow-lg text-sm sm:text-base"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
           <span>{t('addMachine')}</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
         {machines.map(machine => (
           <div key={machine.id} className="bg-white rounded-[32px] overflow-hidden shadow-sm group relative">
             <button 
@@ -2277,15 +2277,15 @@ function BookingsList() {
   const history = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
 
   const BookingCard = ({ booking }: { booking: any, key?: any }) => (
-    <div className="bg-white p-6 rounded-[32px] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div className="flex items-center space-x-4">
-        <div className="bg-[#5A5A40]/10 p-4 rounded-2xl">
-          <Calendar className="w-6 h-6 text-[#5A5A40]" />
+    <div className="bg-white p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+      <div className="flex items-center space-x-3 sm:space-x-4">
+        <div className="bg-[#5A5A40]/10 p-3 sm:p-4 rounded-2xl">
+          <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-[#5A5A40]" />
         </div>
-        <div>
-          <h3 className="font-bold text-lg text-[#5A5A40]">{booking.machineName}</h3>
-          <p className="text-sm text-gray-500">{t('bookingDate')}: {new Date(booking.bookingDate).toLocaleDateString()}</p>
-          <p className="font-bold text-[#5A5A40] mt-1">₹{booking.totalPrice} ({t('perHr')}/{t('perAcre')})</p>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-bold text-base sm:text-lg text-[#5A5A40] truncate">{booking.machineName}</h3>
+          <p className="text-xs sm:text-sm text-gray-500">{t('bookingDate')}: {new Date(booking.bookingDate).toLocaleDateString()}</p>
+          <p className="font-bold text-[#5A5A40] mt-1 text-sm sm:text-base">₹{booking.totalPrice} ({t('perHr')}/{t('perAcre')})</p>
           {booking.ownerId === user?.uid ? (
             <p className="text-xs text-gray-400">{t('roleRenter')}: {booking.renterName}</p>
           ) : (
@@ -2294,19 +2294,19 @@ function BookingsList() {
         </div>
       </div>
       
-      <div className="flex items-center space-x-4">
-        <span className={`px-4 py-2 rounded-full text-sm font-bold flex items-center space-x-2 ${
+      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+        <span className={`px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-bold flex items-center space-x-2 self-start ${
           booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
           booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
           booking.status === 'work_done' ? 'bg-blue-100 text-blue-700' :
           booking.status === 'completed' ? 'bg-purple-100 text-purple-700' :
           'bg-gray-100 text-gray-700'
         }`}>
-          {booking.status === 'confirmed' ? <CheckCircle className="w-4 h-4" /> : 
-           booking.status === 'pending' ? <Clock className="w-4 h-4" /> : 
-           booking.status === 'work_done' ? <CheckCircle className="w-4 h-4" /> :
-           booking.status === 'completed' ? <CheckCircle className="w-4 h-4" /> :
-           <XCircle className="w-4 h-4" />}
+          {booking.status === 'confirmed' ? <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" /> : 
+           booking.status === 'pending' ? <Clock className="w-3 h-3 sm:w-4 sm:h-4" /> : 
+           booking.status === 'work_done' ? <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" /> :
+           booking.status === 'completed' ? <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" /> :
+           <XCircle className="w-3 h-3 sm:w-4 sm:h-4" />}
           <span>{t(booking.status)}</span>
         </span>
 
@@ -2316,13 +2316,13 @@ function BookingsList() {
               onClick={() => updateStatus(booking, 'confirmed')}
               className="bg-green-600 text-white p-2 rounded-xl hover:bg-green-700"
             >
-              <CheckCircle className="w-5 h-5" />
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <button 
               onClick={() => updateStatus(booking, 'cancelled')}
               className="bg-red-600 text-white p-2 rounded-xl hover:bg-red-700"
             >
-              <XCircle className="w-5 h-5" />
+              <XCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         )}
@@ -2330,7 +2330,7 @@ function BookingsList() {
         {booking.renterId === user?.uid && (booking.status === 'pending' || booking.status === 'confirmed') && (
           <button 
             onClick={() => updateStatus(booking, 'cancelled')}
-            className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold hover:bg-red-100"
+            className="bg-red-50 text-red-600 px-3 sm:px-4 py-2 rounded-xl font-bold hover:bg-red-100 text-sm sm:text-base"
           >
             {t('cancel')}
           </button>
@@ -2339,7 +2339,7 @@ function BookingsList() {
         {booking.renterId === user?.uid && booking.status === 'confirmed' && (
           <button 
             onClick={() => setSelectedBooking(booking)}
-            className="bg-[#5A5A40] text-white px-4 py-2 rounded-xl font-bold hover:bg-[#4A4A30]"
+            className="bg-[#5A5A40] text-white px-3 sm:px-4 py-2 rounded-xl font-bold hover:bg-[#4A4A30] text-sm sm:text-base"
           >
             {t('workDone')}
           </button>
@@ -2349,8 +2349,8 @@ function BookingsList() {
   );
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-[#5A5A40] serif">{t('myBookings')}</h2>
+    <div className="space-y-6 sm:space-y-8">
+      <h2 className="text-2xl sm:text-3xl font-bold text-[#5A5A40] serif">{t('myBookings')}</h2>
       
       {pending.length > 0 && (
         <div className="space-y-4">
@@ -2547,13 +2547,13 @@ function PaymentModal({ booking, onClose }: { booking: any, onClose: () => void 
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-white rounded-[40px] p-8 max-w-md w-full"
+        className="bg-white rounded-[32px] sm:rounded-[40px] p-6 sm:p-8 max-w-sm sm:max-w-md w-full mx-4"
       >
-        <h3 className="text-2xl font-bold text-[#5A5A40] mb-6 serif">{t('calculatePayment')}</h3>
+        <h3 className="text-xl sm:text-2xl font-bold text-[#5A5A40] mb-4 sm:mb-6 serif">{t('calculatePayment')}</h3>
         {!calculated ? (
           <div className="space-y-4">
             <div>
