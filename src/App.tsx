@@ -19,6 +19,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  increment,
   Timestamp
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
@@ -2459,6 +2460,7 @@ function PaymentModal({ booking, onClose }: { booking: any, onClose: () => void 
   const { t } = useContext(LanguageContext);
   const [duration, setDuration] = useState('');
   const [calculated, setCalculated] = useState(false);
+  const [paymentComplete, setPaymentComplete] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState({
     base: 0,
     renterFee: 0,
@@ -2466,6 +2468,7 @@ function PaymentModal({ booking, onClose }: { booking: any, onClose: () => void 
     ownerFee: 0,
     ownerNet: 0
   });
+  const [invoiceText, setInvoiceText] = useState('');
 
   const handleCalculate = async () => {
     // Fetch current platform fee
@@ -2489,6 +2492,18 @@ function PaymentModal({ booking, onClose }: { booking: any, onClose: () => void 
     setCalculated(true);
   };
 
+  const downloadInvoice = async (text: string) => {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `invoice_${booking.id}_${Date.now()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handlePayment = async () => {
     await updateDoc(doc(db, 'bookings', booking.id), {
       status: 'completed',
@@ -2500,8 +2515,35 @@ function PaymentModal({ booking, onClose }: { booking: any, onClose: () => void 
       totalPrice: paymentDetails.base,
       workDuration: Number(duration)
     });
-    alert(t('paymentSuccess'));
-    onClose();
+
+    // update owner account with net pay after platform fee
+    await updateDoc(doc(db, 'users', booking.ownerId), {
+      earnings: increment(paymentDetails.ownerNet)
+    }).catch(() => {});
+
+    // create notifications for renter and owner
+    await addDoc(collection(db, 'notifications'), {
+      userId: booking.renterId,
+      message: `Payment successful. ₹${paymentDetails.renterTotal.toFixed(2)} paid (includes ₹${paymentDetails.renterFee.toFixed(2)} platform fee).`,
+      date: new Date().toISOString(),
+      read: false,
+      type: 'success'
+    });
+
+    await addDoc(collection(db, 'notifications'), {
+      userId: booking.ownerId,
+      message: `You received ₹${paymentDetails.ownerNet.toFixed(2)} after 10% platform fee deduction.`,
+      date: new Date().toISOString(),
+      read: false,
+      type: 'success'
+    });
+
+    // Generate invoice
+    const invoice = `Invoice\n==========\nBooking ID: ${booking.id}\nMachine: ${booking.machineName}\nRenter: ${booking.renterName}\nOwner ID: ${booking.ownerId}\nBase Amount: ₹${paymentDetails.base.toFixed(2)}\nPlatform Fee: ₹${paymentDetails.renterFee.toFixed(2)}\nTotal Paid: ₹${paymentDetails.renterTotal.toFixed(2)}\nOwner Net: ₹${paymentDetails.ownerNet.toFixed(2)}\nDate: ${new Date().toLocaleString()}\n`;
+    setInvoiceText(invoice);
+    await downloadInvoice(invoice);
+
+    setPaymentComplete(true);
   };
 
   return (
@@ -2529,6 +2571,23 @@ function PaymentModal({ booking, onClose }: { booking: any, onClose: () => void 
               {t('calculatePayment')}
             </button>
           </div>
+        ) : paymentComplete ? (
+          <div className="space-y-6 text-center">
+            <div className="bg-green-50 border border-green-200 p-6 rounded-3xl">
+              <CheckCircle className="w-10 h-10 mx-auto text-green-600" />
+              <h3 className="font-bold text-lg text-green-700 mt-3">{t('paymentSuccess')}</h3>
+              <p className="text-sm text-gray-600 mt-2">Invoice downloaded. Your owner has been notified, and account updated.</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-2xl overflow-auto text-left text-xs">
+              <pre className="whitespace-pre-wrap font-mono text-gray-700">{invoiceText}</pre>
+            </div>
+            <button 
+              onClick={onClose}
+              className="w-full bg-[#5A5A40] text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-[#4A4A30]"
+            >
+              {t('close') || 'Close'}
+            </button>
+          </div>
         ) : (
           <div className="space-y-6">
             <div className="bg-gray-50 p-6 rounded-3xl space-y-3">
@@ -2543,14 +2602,6 @@ function PaymentModal({ booking, onClose }: { booking: any, onClose: () => void 
               <div className="pt-3 border-t border-gray-200 flex justify-between text-lg">
                 <span className="font-bold text-[#5A5A40]">{t('totalPaid')}</span>
                 <span className="font-bold text-[#5A5A40]">₹{paymentDetails.renterTotal.toFixed(2)}</span>
-              </div>
-              <div className="pt-3 mt-3 border-t border-dashed border-gray-300 flex justify-between text-sm">
-                <span className="text-gray-400">{t('ownerFee')}</span>
-                <span className="text-red-500">-₹{paymentDetails.ownerFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm font-medium text-green-600">
-                <span>{t('netToOwner')}</span>
-                <span>₹{paymentDetails.ownerNet.toFixed(2)}</span>
               </div>
             </div>
             <button 
@@ -2574,12 +2625,63 @@ function PaymentModal({ booking, onClose }: { booking: any, onClose: () => void 
 }
 
 function ProfilePage() {
-  const { profile } = useContext(AuthContext);
+  const { user, profile } = useContext(AuthContext);
   const { t } = useContext(LanguageContext);
+  const [ownerBookings, setOwnerBookings] = useState<any[]>([]);
+  const [renterBookings, setRenterBookings] = useState<any[]>([]);
+  const [bankAccount, setBankAccount] = useState(profile?.bankAccount || '');
+  const [ifscCode, setIfscCode] = useState(profile?.ifscCode || '');
+  const [updateMessage, setUpdateMessage] = useState('');
+
+  useEffect(() => {
+    if (!user) return;
+
+    const ownerQuery = query(collection(db, 'bookings'), where('ownerId', '==', user.uid), where('status', '==', 'completed'));
+    const renterQuery = query(collection(db, 'bookings'), where('renterId', '==', user.uid), where('status', '==', 'completed'));
+
+    const unsubOwner = onSnapshot(ownerQuery, (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setOwnerBookings(docs);
+    });
+
+    const unsubRenter = onSnapshot(renterQuery, (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setRenterBookings(docs);
+    });
+
+    return () => {
+      unsubOwner();
+      unsubRenter();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!profile) return;
+    setBankAccount(profile.bankAccount || '1111222233334444');
+    setIfscCode(profile.ifscCode || 'TEST0001234');
+  }, [profile]);
+
+  const totalOwnerEarnings = ownerBookings.reduce((acc, b) => acc + (b.ownerNet || 0), 0);
+  const totalOwnerFee = ownerBookings.reduce((acc, b) => acc + (b.ownerFee || 0), 0);
+  const totalRenterPaid = renterBookings.reduce((acc, b) => acc + (b.renterTotal || 0), 0);
+
+  const handleSaveBankDetails = async () => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        bankAccount,
+        ifscCode
+      });
+      setUpdateMessage('Account details saved.');
+    } catch (err) {
+      setUpdateMessage('Failed to save account details.');
+    }
+    setTimeout(() => setUpdateMessage(''), 3000);
+  };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
-      <h2 className="text-3xl font-bold text-[#5A5A40] serif">{t('name')}</h2>
+    <div className="max-w-4xl mx-auto space-y-8">
+      <h2 className="text-3xl font-bold text-[#5A5A40] serif">{t('profile')}</h2>
       <div className="bg-white p-8 rounded-[40px] shadow-sm space-y-6">
         <div className="flex items-center space-x-6 pb-6 border-b border-gray-100">
           <div className="w-20 h-20 bg-[#5A5A40] rounded-3xl flex items-center justify-center text-white text-3xl font-bold">
@@ -2587,7 +2689,7 @@ function ProfilePage() {
           </div>
           <div>
             <h3 className="text-2xl font-bold text-[#5A5A40]">{profile?.name}</h3>
-            <p className="text-gray-500">{profile?.role === 'renter' ? t('roleRenter') : t('roleProvider')}</p>
+            <p className="text-gray-500">{profile?.role === 'user' ? t('roleUser') : profile?.role === 'admin' ? t('roleAdmin') : t('roleOwner')}</p>
           </div>
         </div>
 
@@ -2598,29 +2700,68 @@ function ProfilePage() {
           </div>
           <div className="space-y-1">
             <p className="text-sm text-gray-400 uppercase tracking-wider font-bold">{t('phone')}</p>
-            <p className="text-lg font-medium text-[#5A5A40]">{profile?.phone}</p>
+            <p className="text-lg font-medium text-[#5A5A40]">{profile?.phone || '-'}</p>
           </div>
-          <div className="space-y-1">
-            <p className="text-sm text-gray-400 uppercase tracking-wider font-bold">{t('location')}</p>
-            <p className="text-lg font-medium text-[#5A5A40]">{profile?.location}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm text-gray-400 uppercase tracking-wider font-bold">{t('language')}</p>
-            <p className="text-lg font-medium text-[#5A5A40] capitalize">{profile?.language}</p>
-          </div>
-          {profile?.role === 'provider' && (
-            <>
-              <div className="space-y-1">
-                <p className="text-sm text-gray-400 uppercase tracking-wider font-bold">{t('bankAccount')}</p>
-                <p className="text-lg font-medium text-[#5A5A40]">{profile?.bankAccount || 'N/A'}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-gray-400 uppercase tracking-wider font-bold">{t('ifscCode')}</p>
-                <p className="text-lg font-medium text-[#5A5A40]">{profile?.ifscCode || 'N/A'}</p>
-              </div>
-            </>
-          )}
         </div>
+
+        {profile?.role !== 'admin' && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-500 mb-1">{t('bankAccount')}</label>
+                <input value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} className="w-full p-3 border rounded-xl" placeholder="Enter bank account" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-500 mb-1">{t('ifscCode')}</label>
+                <input value={ifscCode} onChange={(e) => setIfscCode(e.target.value)} className="w-full p-3 border rounded-xl" placeholder="Enter IFSC code" />
+              </div>
+            </div>
+            <div className="flex gap-3 items-center">
+              <button onClick={handleSaveBankDetails} className="bg-[#5A5A40] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#4A4A30]">{t('save')}</button>
+            </div>
+            {updateMessage && <p className="text-sm text-green-600">{updateMessage}</p>}
+
+            <div className="space-y-3 pt-4 border-t border-gray-100">
+              <h3 className="text-lg font-bold text-[#5A5A40]">Machine Owner Payments</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-xl p-4 bg-green-50">
+                  <p className="text-sm text-gray-500">Total Received</p>
+                  <p className="text-2xl font-bold text-green-700">₹{totalOwnerEarnings.toFixed(2)}</p>
+                </div>
+                <div className="rounded-xl p-4 bg-red-50">
+                  <p className="text-sm text-gray-500">Platform Fee Deducted</p>
+                  <p className="text-2xl font-bold text-red-700">₹{totalOwnerFee.toFixed(2)}</p>
+                </div>
+                <div className="rounded-xl p-4 bg-blue-50 col-span-2">
+                  <p className="text-sm text-gray-500">Total Paid By Renters</p>
+                  <p className="text-2xl font-bold text-blue-700">₹{totalRenterPaid.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-4 border-t border-gray-100">
+              <h3 className="text-lg font-bold text-[#5A5A40]">Recent Completed Bookings</h3>
+              {ownerBookings.length === 0 ? (
+                <p className="text-gray-400">No completed payments yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {ownerBookings.map((b) => (
+                    <div key={b.id} className="p-3 rounded-xl border border-gray-200 flex justify-between">
+                      <div>
+                        <p className="font-bold">{b.machineName}</p>
+                        <p className="text-xs text-gray-500">{new Date(b.date).toLocaleDateString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-700">Net ₹{(b.ownerNet || 0).toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">Fee ₹{(b.ownerFee || 0).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         <div className="pt-8 border-t border-gray-100">
           <button 
