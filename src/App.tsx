@@ -1219,6 +1219,7 @@ function LandingPage() {
   });
   const [otp, setOtp] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
+  const [showOtpPopup, setShowOtpPopup] = useState(false);
   const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [captchaQuestion, setCaptchaQuestion] = useState({ a: 0, b: 0, op: '+', answer: 0 });
   const [password, setPassword] = useState('');
@@ -1259,7 +1260,7 @@ function LandingPage() {
     // Generate 6-digit OTP (demo)
     const demoOtp = String(Math.floor(100000 + Math.random() * 900000));
     setGeneratedOtp(demoOtp);
-    console.info('Demo OTP (dev only):', demoOtp);
+    setShowOtpPopup(true); // Show OTP popup instead of console
     setStep('otp');
   };
 
@@ -1389,7 +1390,7 @@ function LandingPage() {
     }
   };
 
-  const resetToDetails = () => { setStep('details'); setOtp(''); setGeneratedOtp(''); setCaptchaAnswer(''); setError(''); };
+  const resetToDetails = () => { setStep('details'); setOtp(''); setGeneratedOtp(''); setCaptchaAnswer(''); setError(''); setShowOtpPopup(false); };
 
   // Step indicator for register
   const steps = ['Details', 'OTP', 'Captcha', 'Password'];
@@ -1559,10 +1560,10 @@ function LandingPage() {
             {/* STEP 2: OTP */}
             {step === 'otp' && (
               <form onSubmit={handleOtpSubmit} className="space-y-4 text-center">
-                <div className="bg-blue-50 rounded-2xl p-4 mb-2">
-                  <p className="text-sm text-blue-700 font-semibold">Demo OTP sent!</p>
-                  <p className="text-xs text-blue-500 mt-1">Check your browser console for the OTP code</p>
-                  <p className="text-xs text-blue-400 mt-1">(In production this would be sent via SMS)</p>
+                <div className="bg-green-50 rounded-2xl p-4 mb-2">
+                  <p className="text-sm text-green-700 font-semibold">✅ OTP sent to your phone!</p>
+                  <p className="text-xs text-green-600 mt-1">Enter the 6-digit code below</p>
+                  <p className="text-xs text-green-500 mt-1">(In production this would be sent via SMS)</p>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Enter 6-digit OTP</label>
@@ -1642,6 +1643,59 @@ function LandingPage() {
           ))}
         </div>
       </motion.div>
+
+      {/* OTP Popup Modal */}
+      {showOtpPopup && (
+        <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-[32px] p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl"
+          >
+            <div className="bg-[#5A5A40]/10 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 sm:w-10 sm:h-10 text-[#5A5A40]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-[#5A5A40] mb-2">Your OTP Code</h3>
+            <p className="text-sm text-gray-600 mb-6">Click below to auto-fill this code</p>
+            
+            <div 
+              className="bg-gray-50 rounded-2xl p-4 sm:p-6 mb-6 border-2 border-[#5A5A40]/20 cursor-pointer hover:bg-[#5A5A40]/5 transition-colors"
+              onClick={() => {
+                navigator.clipboard.writeText(generatedOtp);
+                // Could add a toast notification here
+              }}
+            >
+              <div className="text-3xl sm:text-4xl font-black text-[#5A5A40] tracking-wider font-mono select-all">
+                {generatedOtp}
+              </div>
+              <p className="text-xs text-[#5A5A40]/60 mt-2 font-medium">Click to copy or use auto-fill</p>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button 
+                onClick={() => {
+                  setOtp(generatedOtp);
+                  setShowOtpPopup(false);
+                  // Focus on OTP input after a short delay
+                  setTimeout(() => {
+                    const otpInput = document.querySelector('input[pattern="[0-9]{6}"]') as HTMLInputElement;
+                    if (otpInput) otpInput.focus();
+                  }, 100);
+                }}
+                className="flex-1 bg-[#5A5A40] text-white py-3 sm:py-4 rounded-2xl font-bold shadow-lg hover:bg-[#4A4A30] transition-all"
+              >
+                Auto-fill OTP ✨
+              </button>
+            </div>
+            
+            <p className="text-xs text-gray-400 mt-4">
+              This is a demo OTP. In production, this would be sent via SMS.
+            </p>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
